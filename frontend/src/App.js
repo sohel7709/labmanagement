@@ -2,6 +2,11 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import Layout from './components/Layout';
+import TechnicianDashboard from './pages/TechnicianDashboard';
+import TestReport from './pages/TestReport';
+import ReportHistory from './pages/ReportHistory';
+import PatientList from './pages/PatientList';
+import AddPatient from './pages/AddPatient';
 import Dashboard from './pages/Dashboard';
 import NotFound from './pages/NotFound';
 import Profile from './pages/Profile';
@@ -35,38 +40,42 @@ const App = () => {
                         path="/"
                         element={
                             <Layout>
-                                <Dashboard />
+                                <TechnicianDashboard />
                             </Layout>
                         }
                     />
-
                     <Route
-                        path="/reports"
+                        path="/reports/new"
                         element={
                             <Layout>
-                                {/* <Reports /> */}
+                                <TestReport />
                             </Layout>
                         }
                     />
-
+                    <Route
+                        path="/reports/history"
+                        element={
+                            <Layout>
+                                <ReportHistory />
+                            </Layout>
+                        }
+                    />
                     <Route
                         path="/patients"
                         element={
                             <Layout>
-                                {/* <Patients /> */}
+                                <PatientList />
                             </Layout>
                         }
                     />
-
                     <Route
-                        path="/settings"
+                        path="/patients/add"
                         element={
                             <Layout>
-                                {/* <Settings /> */}
+                                <AddPatient />
                             </Layout>
                         }
                     />
-
                     <Route
                         path="/profile"
                         element={
@@ -75,7 +84,6 @@ const App = () => {
                             </Layout>
                         }
                     />
-
                     {/* 404 Route */}
                     <Route path="*" element={<NotFound />} />
                 </Routes>

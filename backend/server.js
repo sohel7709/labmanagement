@@ -3,9 +3,11 @@ const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const cors = require('cors');
 const path = require('path');
+const { protect } = require('./middleware/mockAuthMiddleware');
 
 // Route imports
 const testReportRoutes = require('./routes/testReportRoutes');
+const patientRoutes = require('./routes/patientRoutes');
 
 dotenv.config();
 connectDB();
@@ -19,8 +21,12 @@ app.use(express.json());
 // Serve uploaded files
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+// Apply mock auth middleware to all routes
+app.use(protect);
+
 // Routes
 app.use('/api/reports', testReportRoutes);
+app.use('/api/patients', patientRoutes);
 
 app.get('/', (req, res) => {
     res.send('API is running...');

@@ -64,7 +64,7 @@ const getTestReports = asyncHandler(async (req, res) => {
     const count = await TestReport.countDocuments(filterOptions);
     
     const reports = await TestReport.find(filterOptions)
-        .populate('patient', 'name patientId')
+        .populate('patient', 'name')
         .populate('technician', 'name')
         .populate('verifiedBy', 'name')
         .sort({ createdAt: -1 })
@@ -84,7 +84,7 @@ const getTestReports = asyncHandler(async (req, res) => {
 // @access  Private
 const getTestReportById = asyncHandler(async (req, res) => {
     const report = await TestReport.findById(req.params.id)
-        .populate('patient', 'name patientId gender age contact')
+        .populate('patient', 'name gender age contact')
         .populate('technician', 'name')
         .populate('verifiedBy', 'name');
 
@@ -133,7 +133,7 @@ const updateTestReport = asyncHandler(async (req, res) => {
 // @access  Private
 const generatePDF = asyncHandler(async (req, res) => {
     const report = await TestReport.findById(req.params.id)
-        .populate('patient', 'name patientId gender age contact')
+        .populate('patient', 'name gender age contact')
         .populate('technician', 'name')
         .populate('verifiedBy', 'name')
         .populate('lab', 'name contact logo settings');
@@ -165,8 +165,7 @@ const generatePDF = asyncHandler(async (req, res) => {
 
     // Patient Info
     doc.moveDown();
-    doc.fontSize(12).text(`Patient ID: ${report.patient.patientId}`);
-    doc.text(`Name: ${report.patient.name}`);
+    doc.fontSize(12).text(`Name: ${report.patient.name}`);
     doc.text(`Gender: ${report.patient.gender}`);
     doc.text(`Age: ${report.patient.age}`);
     doc.text(`Report ID: ${report.reportId}`);

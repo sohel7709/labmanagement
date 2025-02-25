@@ -1,15 +1,10 @@
 const mongoose = require('mongoose');
 
-const patientSchema = mongoose.Schema({
+const patientSchema = new mongoose.Schema({
     lab: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Lab',
         required: true
-    },
-    patientId: {
-        type: String,
-        required: true,
-        unique: true
     },
     name: {
         type: String,
@@ -58,18 +53,6 @@ const patientSchema = mongoose.Schema({
     }
 }, {
     timestamps: true
-});
-
-// Create patient ID before saving
-patientSchema.pre('save', async function(next) {
-    if (!this.patientId) {
-        const currentDate = new Date();
-        const year = currentDate.getFullYear().toString().substr(-2);
-        const month = (currentDate.getMonth() + 1).toString().padStart(2, '0');
-        const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-        this.patientId = `P${year}${month}${randomNum}`;
-    }
-    next();
 });
 
 module.exports = mongoose.model('Patient', patientSchema);
