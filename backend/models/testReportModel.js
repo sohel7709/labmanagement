@@ -8,7 +8,7 @@ const testReportSchema = mongoose.Schema({
     },
     patient: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'Patient',
+        ref: 'NewPatient',
         required: true
     },
     reportId: {
