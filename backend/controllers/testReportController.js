@@ -1,267 +1,165 @@
 const asyncHandler = require('express-async-handler');
-const TestReport = require('../models/testReportModel');
-const Patient = require('../models/patientModel');
-const PDFDocument = require('pdfkit');
-const fs = require('fs');
-const path = require('path');
+const ReportService = require('../services/reportService');
 
-// @desc    Create new test report
+// @desc    Create new report
 // @route   POST /api/reports
-// @access  Private/Technician
-const createTestReport = asyncHandler(async (req, res) => {
-    const {
-        patient,
-        testType,
-        category,
-        parameters,
-        sampleType,
-        urgency
-    } = req.body;
+// @access  Private/Admin,Technician
+const createReport = asyncHandler(async (req, res) => {
+    const report = await ReportService.createReport(
+        req.body,
+        req.user._id,
+        req.user.lab
+    );
 
-    // Check if patient exists
-    const patientExists = await Patient.findById(patient);
-    if (!patientExists) {
-        res.status(404);
-        throw new Error('Patient not found');
-    }
-
-    const report = await TestReport.create({
-        lab: req.user.lab,
-        patient,
-        testType,
-        category,
-        parameters,
-        sampleType,
-        urgency,
-        technician: req.user._id,
-        sampleCollectedAt: new Date()
-    });
-
-    if (report) {
-        res.status(201).json(report);
-    } else {
-        res.status(400);
-        throw new Error('Invalid report data');
-    }
+    res.status(201).json(report);
 });
 
-// @desc    Get all test reports for a lab
+// @desc    Get all reports
 // @route   GET /api/reports
-// @access  Private
-const getTestReports = asyncHandler(async (req, res) => {
-    const pageSize = 10;
-    const page = Number(req.query.page) || 1;
-    
-    const filterOptions = {
-        lab: req.user.lab
+// @access  Private/Admin,Technician
+const getReports = asyncHandler(async (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+
+    const filters = {
+        status: req.query.status,
+        priority: req.query.priority,
+        testType: req.query.testType,
+        patientId: req.query.patientId,
+        startDate: req.query.startDate,
+        endDate: req.query.endDate
     };
 
-    // Add filters if provided
-    if (req.query.status) filterOptions.status = req.query.status;
-    if (req.query.urgency) filterOptions.urgency = req.query.urgency;
-    if (req.query.testType) filterOptions.testType = req.query.testType;
-
-    const count = await TestReport.countDocuments(filterOptions);
-    
-    const reports = await TestReport.find(filterOptions)
-        .populate('patient', 'name')
-        .populate('technician', 'name')
-        .populate('verifiedBy', 'name')
-        .sort({ createdAt: -1 })
-        .limit(pageSize)
-        .skip(pageSize * (page - 1));
-
-    res.json({
-        reports,
+    const result = await ReportService.getReports(
+        filters,
         page,
-        pages: Math.ceil(count / pageSize),
-        total: count
-    });
+        limit,
+        req.user
+    );
+
+    res.json(result);
 });
 
-// @desc    Get test report by ID
+// @desc    Get single report
 // @route   GET /api/reports/:id
-// @access  Private
-const getTestReportById = asyncHandler(async (req, res) => {
-    const report = await TestReport.findById(req.params.id)
-        .populate('patient', 'name gender age contact')
-        .populate('technician', 'name')
-        .populate('verifiedBy', 'name');
+// @access  Private/Admin,Technician
+const getReport = asyncHandler(async (req, res) => {
+    const report = await ReportService.getReport(
+        req.params.id,
+        req.user
+    );
 
-    if (report) {
-        res.json(report);
-    } else {
-        res.status(404);
-        throw new Error('Report not found');
-    }
+    res.json(report);
 });
 
-// @desc    Update test report
+// @desc    Update report
 // @route   PUT /api/reports/:id
-// @access  Private/Technician
-const updateTestReport = asyncHandler(async (req, res) => {
-    const report = await TestReport.findById(req.params.id);
+// @access  Private/Admin,Technician
+const updateReport = asyncHandler(async (req, res) => {
+    const report = await ReportService.updateReport(
+        req.params.id,
+        req.body,
+        req.user
+    );
 
-    if (!report) {
-        res.status(404);
-        throw new Error('Report not found');
-    }
-
-    // Check if user is authorized to update
-    if (report.technician.toString() !== req.user._id.toString() && 
-        req.user.role !== 'admin' && 
-        req.user.role !== 'super_admin') {
-        res.status(403);
-        throw new Error('Not authorized to update this report');
-    }
-
-    // Update report
-    Object.assign(report, req.body);
-    
-    // If report is being verified
-    if (req.body.status === 'verified') {
-        report.verifiedBy = req.user._id;
-        report.reportGeneratedAt = new Date();
-    }
-
-    const updatedReport = await report.save();
-    res.json(updatedReport);
+    res.json(report);
 });
 
-// @desc    Generate PDF report
-// @route   POST /api/reports/:id/pdf
-// @access  Private
-const generatePDF = asyncHandler(async (req, res) => {
-    const report = await TestReport.findById(req.params.id)
-        .populate('patient', 'name gender age contact')
-        .populate('technician', 'name')
-        .populate('verifiedBy', 'name')
-        .populate('lab', 'name contact logo settings');
+// @desc    Delete report
+// @route   DELETE /api/reports/:id
+// @access  Private/Admin
+const deleteReport = asyncHandler(async (req, res) => {
+    const result = await ReportService.deleteReport(
+        req.params.id,
+        req.user
+    );
 
-    if (!report) {
-        res.status(404);
-        throw new Error('Report not found');
-    }
-
-    const doc = new PDFDocument();
-    const filename = `report_${report.reportId}.pdf`;
-    const filepath = path.join('uploads', 'reports', filename);
-
-    // Ensure directory exists
-    if (!fs.existsSync(path.join('uploads', 'reports'))) {
-        fs.mkdirSync(path.join('uploads', 'reports'), { recursive: true });
-    }
-
-    // Pipe PDF to file
-    doc.pipe(fs.createWriteStream(filepath));
-
-    // Add content to PDF
-    // Header
-    if (report.lab.logo) {
-        doc.image(report.lab.logo, 50, 45, { width: 50 });
-    }
-    doc.fontSize(20).text(report.lab.name, 120, 50);
-    doc.fontSize(10).text(report.lab.settings.reportHeader || '', 120, 70);
-
-    // Patient Info
-    doc.moveDown();
-    doc.fontSize(12).text(`Name: ${report.patient.name}`);
-    doc.text(`Gender: ${report.patient.gender}`);
-    doc.text(`Age: ${report.patient.age}`);
-    doc.text(`Report ID: ${report.reportId}`);
-    doc.text(`Date: ${report.createdAt.toLocaleDateString()}`);
-
-    // Test Results
-    doc.moveDown();
-    doc.fontSize(14).text('Test Results', { underline: true });
-    doc.moveDown();
-
-    // Parameters table
-    const startX = 50;
-    let startY = doc.y;
-    const rowHeight = 25;
-    const colWidths = [200, 100, 150, 100];
-
-    // Table headers
-    doc.fontSize(10);
-    doc.text('Parameter', startX, startY);
-    doc.text('Result', startX + colWidths[0], startY);
-    doc.text('Reference Range', startX + colWidths[0] + colWidths[1], startY);
-    doc.text('Status', startX + colWidths[0] + colWidths[1] + colWidths[2], startY);
-
-    startY += rowHeight;
-
-    // Table rows
-    report.parameters.forEach(param => {
-        doc.text(param.name, startX, startY);
-        doc.text(param.value, startX + colWidths[0], startY);
-        doc.text(param.referenceRange.text || `${param.referenceRange.min} - ${param.referenceRange.max}`, 
-            startX + colWidths[0] + colWidths[1], startY);
-        doc.text(param.status, startX + colWidths[0] + colWidths[1] + colWidths[2], startY);
-        startY += rowHeight;
-    });
-
-    // Comments
-    if (report.result.remarks) {
-        doc.moveDown();
-        doc.fontSize(12).text('Remarks:', { underline: true });
-        doc.fontSize(10).text(report.result.remarks);
-    }
-
-    // Footer
-    doc.fontSize(10).text(report.lab.settings.reportFooter || '', 50, doc.page.height - 50);
-
-    // Signatures
-    if (report.status === 'verified') {
-        doc.text(`Verified by: ${report.verifiedBy.name}`, 
-            doc.page.width - 200, doc.page.height - 50);
-    }
-
-    doc.end();
-
-    // Update report with PDF URL
-    report.reportPdfUrl = filepath;
-    await report.save();
-
-    res.json({ 
-        message: 'PDF generated successfully',
-        pdfUrl: filepath 
-    });
+    res.json(result);
 });
 
-// @desc    Upload test report attachments
-// @route   POST /api/reports/:id/attachments
-// @access  Private/Technician
-const uploadAttachments = asyncHandler(async (req, res) => {
-    const report = await TestReport.findById(req.params.id);
+// @desc    Get report statistics
+// @route   GET /api/reports/stats
+// @access  Private/Admin
+const getReportStats = asyncHandler(async (req, res) => {
+    const startDate = req.query.startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default to last 30 days
+    const endDate = req.query.endDate || new Date();
 
-    if (!report) {
-        res.status(404);
-        throw new Error('Report not found');
-    }
+    const stats = await ReportService.getReportStats(
+        req.user.lab,
+        startDate,
+        endDate
+    );
 
-    if (!req.files || req.files.length === 0) {
+    res.json(stats);
+});
+
+// @desc    Assign report to technician
+// @route   PUT /api/reports/:id/assign
+// @access  Private/Admin
+const assignReport = asyncHandler(async (req, res) => {
+    const { technicianId } = req.body;
+
+    if (!technicianId) {
         res.status(400);
-        throw new Error('No files uploaded');
+        throw new Error('Please provide technician ID');
     }
 
-    const attachments = req.files.map(file => ({
-        filename: file.filename,
-        path: file.path,
-        uploadedAt: new Date()
-    }));
+    const report = await ReportService.updateReport(
+        req.params.id,
+        {
+            assignedTo: technicianId,
+            status: 'assigned'
+        },
+        req.user
+    );
 
-    report.attachments.push(...attachments);
-    await report.save();
+    res.json(report);
+});
+
+// @desc    Verify report
+// @route   PUT /api/reports/:id/verify
+// @access  Private/Admin
+const verifyReport = asyncHandler(async (req, res) => {
+    const report = await ReportService.updateReport(
+        req.params.id,
+        {
+            status: 'verified',
+            verificationNotes: req.body.verificationNotes
+        },
+        req.user
+    );
+
+    res.json(report);
+});
+
+// @desc    Add comment to report
+// @route   POST /api/reports/:id/comments
+// @access  Private/Admin,Technician
+const addComment = asyncHandler(async (req, res) => {
+    const { comment } = req.body;
+
+    if (!comment) {
+        res.status(400);
+        throw new Error('Please provide comment');
+    }
+
+    const report = await ReportService.updateReport(
+        req.params.id,
+        { comment },
+        req.user
+    );
 
     res.json(report);
 });
 
 module.exports = {
-    createTestReport,
-    getTestReports,
-    getTestReportById,
-    updateTestReport,
-    generatePDF,
-    uploadAttachments
+    createReport,
+    getReports,
+    getReport,
+    updateReport,
+    deleteReport,
+    getReportStats,
+    assignReport,
+    verifyReport,
+    addComment
 };

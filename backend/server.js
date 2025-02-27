@@ -1,77 +1,63 @@
 const express = require('express');
 const dotenv = require('dotenv');
-const connectDB = require('./config/db');
 const cors = require('cors');
 const path = require('path');
-const { protect } = require('./middleware/mockAuthMiddleware');
+const mongoose = require('mongoose');
+const { errorHandler, notFound } = require('./middleware/errorMiddleware');
+const loggingMiddleware = require('./middleware/loggingMiddleware');
 
-// Route imports
-const testReportRoutes = require('./routes/testReportRoutes');
+// Import routes
+const authRoutes = require('./routes/authRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const technicianRoutes = require('./routes/technicianRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 const patientRoutes = require('./routes/patientRoutes');
+const superAdminRoutes = require('./routes/superAdminRoutes');
 
+// Load env vars
 dotenv.config();
-connectDB();
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+});
+
+mongoose.connection.on('connected', () => {
+    console.log('MongoDB Connected:', mongoose.connection.host);
+});
 
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(loggingMiddleware);
 
-// Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Mount routes - Order matters!
+// Mount superAdmin routes first as they are more specific
+app.use('/api/superadmin', superAdminRoutes);  // Changed from /api to /api/superadmin
 
-// Apply mock auth middleware to all routes
-app.use(protect);
-
-// Routes
-app.use('/api/reports', testReportRoutes);
+// Mount other routes
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/technician', technicianRoutes);
+app.use('/api/reports', reportRoutes);
 app.use('/api/patients', patientRoutes);
 
-app.get('/', (req, res) => {
-    res.send('API is running...');
+// API Documentation
+app.get('/api/docs', (req, res) => {
+    res.sendFile(path.join(__dirname, 'docs', 'api.html'));
 });
 
-// Simple error handler
-app.use((err, req, res, next) => {
-    const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
-    res.status(statusCode);
-    res.json({
-        message: err.message,
-        stack: process.env.NODE_ENV === 'production' ? null : err.stack,
-    });
+// Error handling
+app.use(notFound);
+app.use(errorHandler);
+
+const PORT = process.env.PORT || 5000;
+const MODE = process.env.NODE_ENV || 'development';
+
+app.listen(PORT, () => {
+    console.log(`Server running in ${MODE} mode on port ${PORT}`);
+    console.log(`Documentation available at http://localhost:${PORT}/api/docs`);
 });
-
-// Start server with port fallback
-const startServer = async () => {
-    const ports = [5000, 5001, 5002, 5003, 5004];
-    
-    for (const port of ports) {
-        try {
-            await new Promise((resolve, reject) => {
-                const server = app.listen(port)
-                    .once('listening', () => {
-                        console.log(`Server running on port ${port}`);
-                        resolve();
-                    })
-                    .once('error', (err) => {
-                        if (err.code === 'EADDRINUSE') {
-                            server.close();
-                            reject(new Error(`Port ${port} is in use`));
-                        } else {
-                            reject(err);
-                        }
-                    });
-            });
-            break; // If successful, exit the loop
-        } catch (err) {
-            console.log(err.message);
-            if (port === ports[ports.length - 1]) {
-                console.error('No available ports found');
-                process.exit(1);
-            }
-        }
-    }
-};
-
-startServer();
