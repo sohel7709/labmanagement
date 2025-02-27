@@ -1,51 +1,49 @@
 const mongoose = require('mongoose');
 
-const labSchema = mongoose.Schema({
+const labSchema = new mongoose.Schema({
     name: {
         type: String,
-        required: [true, 'Please add a lab name'],
-        unique: true
+        required: [true, 'Lab name is required'],
+        trim: true
     },
     address: {
-        street: String,
-        city: String,
-        state: String,
-        zipCode: String,
-        country: String
+        type: String,
+        required: [true, 'Lab address is required']
     },
     contact: {
-        phone: String,
-        email: String,
-        website: String
-    },
-    logo: {
         type: String,
-        default: 'default-lab-logo.png'
+        required: [true, 'Contact number is required']
     },
-    licenseNumber: {
+    email: {
         type: String,
-        required: [true, 'Please add a license number'],
-        unique: true
+        required: [true, 'Email is required'],
+        unique: true,
+        lowercase: true
     },
     status: {
         type: String,
         enum: ['active', 'inactive', 'suspended'],
         default: 'active'
     },
-    settings: {
-        reportHeader: String,
-        reportFooter: String,
-        currency: {
-            type: String,
-            default: 'USD'
-        },
-        timeZone: {
-            type: String,
-            default: 'UTC'
-        }
+    subscription: {
+        type: String,
+        enum: ['basic', 'premium', 'enterprise'],
+        default: 'basic'
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
+    },
+    updatedAt: {
+        type: Date,
+        default: Date.now
     }
-}, {
-    timestamps: true
+});
+
+// Update timestamp on save
+labSchema.pre('save', function(next) {
+    this.updatedAt = Date.now();
+    next();
 });
 
 module.exports = mongoose.model('Lab', labSchema);

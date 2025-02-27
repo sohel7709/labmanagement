@@ -1,21 +1,55 @@
-import { Navigate, useLocation } from 'react-router-dom';
+import React from 'react';
+import { Route, Redirect } from 'react-router-dom';
+import { useRole } from '../context/RoleContext';
+import { CircularProgress, Box } from '@mui/material';
 
-const PrivateRoute = ({ children, roles = [] }) => {
-    const location = useLocation();
-    
-    // Mock user with admin privileges to bypass authentication
-    const mockUser = {
-        role: 'super_admin'
-    };
+const PrivateRoute = ({ component: Component, requiredRole = null, requiredPermission = null, ...rest }) => {
+  const { user, loading, hasRole, hasPermission } = useRole();
 
-    // Bypass authentication check and use mock user
-    if (roles.length > 0 && !roles.includes(mockUser.role)) {
-        // Role not authorized, redirect to home page
-        return <Navigate to="/" replace />;
-    }
+  if (loading) {
+    return (
+      <Box
+        display="flex"
+        justifyContent="center"
+        alignItems="center"
+        minHeight="100vh"
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
 
-    // Authorized, render component
-    return children;
+  return (
+    <Route
+      {...rest}
+      render={props => {
+        if (!user) {
+          // Not logged in, redirect to login page with return url
+          return (
+            <Redirect
+              to={{
+                pathname: '/login',
+                state: { from: props.location }
+              }}
+            />
+          );
+        }
+
+        if (requiredRole && !hasRole(requiredRole)) {
+          // Role doesn't match, redirect to home page
+          return <Redirect to="/" />;
+        }
+
+        if (requiredPermission && !hasPermission(requiredPermission)) {
+          // Permission missing, redirect to home page
+          return <Redirect to="/" />;
+        }
+
+        // Authorized, render component
+        return <Component {...props} />;
+      }}
+    />
+  );
 };
 
 export default PrivateRoute;

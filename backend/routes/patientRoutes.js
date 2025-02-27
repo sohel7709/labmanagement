@@ -1,28 +1,34 @@
 const express = require('express');
 const router = express.Router();
-const loggingMiddleware = require('../middleware/loggingMiddleware');
 const {
-    addPatient,
     getPatients,
     getPatient,
+    createPatient,
     updatePatient,
     deletePatient,
     searchPatients
 } = require('../controllers/patientController');
+const {
+    protect,
+    checkPermission,
+    setLabContext
+} = require('../middleware/authMiddleware');
 
-// Use logging middleware
-router.use(loggingMiddleware);
+// Protect all routes and set lab context
+router.use(protect);
+router.use(setLabContext);
 
-// All routes require authentication
+// Patient management routes
 router.route('/')
-    .post(addPatient)
-    .get(getPatients);
+    .get(checkPermission('view_patients'), getPatients)
+    .post(checkPermission('manage_patients'), createPatient);
 
-router.get('/search', searchPatients);
+router.route('/search')
+    .get(checkPermission('view_patients'), searchPatients);
 
 router.route('/:id')
-    .get(getPatient)
-    .put(updatePatient)
-    .delete(deletePatient);
+    .get(checkPermission('view_patients'), getPatient)
+    .put(checkPermission('manage_patients'), updatePatient)
+    .delete(checkPermission('manage_patients'), deletePatient);
 
 module.exports = router;

@@ -1,56 +1,38 @@
 const asyncHandler = require('express-async-handler');
-const mongoose = require('mongoose');
-const Patient = mongoose.models.NewPatient || require('../models/patientModel');
-
-// @desc    Add new patient
-// @route   POST /api/patients
-// @access  Private
-const addPatient = asyncHandler(async (req, res) => {
-    console.log('Received request to add patient:', req.body);
-    const { name, age, gender, phone } = req.body;
-
-    // Validate phone number (must be 10 digits)
-    const phoneRegex = /^\d{10}$/;
-    if (!phoneRegex.test(phone)) {
-        res.status(400);
-        throw new Error('Phone number must be 10 digits');
-    }
-
-    try {
-        // Create patient
-        const patient = new Patient({
-            name,
-            age,
-            gender,
-            contact: { phone },
-            lab: req.user.lab, // From auth middleware
-            registeredBy: req.user._id
-        });
-
-        await patient.save();
-        res.status(201).json(patient);
-    } catch (error) {
-        console.error('Error saving patient:', error);
-        res.status(400);
-        throw new Error(error.message || 'Invalid patient data');
-    }
-});
+const Patient = require('../models/patientModel');
 
 // @desc    Get all patients
 // @route   GET /api/patients
 // @access  Private
 const getPatients = asyncHandler(async (req, res) => {
-    const patients = await Patient.find({ lab: req.user.lab });
-    res.json(patients);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const query = { lab: req.user.lab };
+
+    const patients = await Patient.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+
+    const total = await Patient.countDocuments(query);
+
+    res.json({
+        patients,
+        page,
+        totalPages: Math.ceil(total / limit),
+        total
+    });
 });
 
 // @desc    Get single patient
 // @route   GET /api/patients/:id
 // @access  Private
 const getPatient = asyncHandler(async (req, res) => {
-    const patient = await Patient.findOne({ 
+    const patient = await Patient.findOne({
         _id: req.params.id,
-        lab: req.user.lab 
+        lab: req.user.lab
     });
 
     if (!patient) {
@@ -59,6 +41,18 @@ const getPatient = asyncHandler(async (req, res) => {
     }
 
     res.json(patient);
+});
+
+// @desc    Create new patient
+// @route   POST /api/patients
+// @access  Private
+const createPatient = asyncHandler(async (req, res) => {
+    const patient = await Patient.create({
+        ...req.body,
+        lab: req.user.lab
+    });
+
+    res.status(201).json(patient);
 });
 
 // @desc    Update patient
@@ -88,23 +82,19 @@ const updatePatient = asyncHandler(async (req, res) => {
 // @route   DELETE /api/patients/:id
 // @access  Private
 const deletePatient = asyncHandler(async (req, res) => {
-    try {
-        const deletedPatient = await Patient.findOneAndDelete({
-            _id: req.params.id,
-            lab: req.user.lab
-        });
+    const patient = await Patient.findOne({
+        _id: req.params.id,
+        lab: req.user.lab
+    });
 
-        if (!deletedPatient) {
-            res.status(404);
-            throw new Error('Patient not found');
-        }
-
-        res.json({ message: 'Patient removed', id: req.params.id });
-    } catch (error) {
-        console.error('Error deleting patient:', error);
-        res.status(500);
-        throw new Error('Failed to delete patient: ' + error.message);
+    if (!patient) {
+        res.status(404);
+        throw new Error('Patient not found');
     }
+
+    await patient.remove();
+
+    res.json({ message: 'Patient removed' });
 });
 
 // @desc    Search patients
@@ -112,22 +102,26 @@ const deletePatient = asyncHandler(async (req, res) => {
 // @access  Private
 const searchPatients = asyncHandler(async (req, res) => {
     const { query } = req.query;
-    
-    const patients = await Patient.find({
+    const searchQuery = {
         lab: req.user.lab,
         $or: [
             { name: { $regex: query, $options: 'i' } },
-            { 'contact.phone': { $regex: query, $options: 'i' } }
+            { email: { $regex: query, $options: 'i' } },
+            { phone: { $regex: query, $options: 'i' } }
         ]
-    });
+    };
+
+    const patients = await Patient.find(searchQuery)
+        .limit(10)
+        .sort({ createdAt: -1 });
 
     res.json(patients);
 });
 
 module.exports = {
-    addPatient,
     getPatients,
     getPatient,
+    createPatient,
     updatePatient,
     deletePatient,
     searchPatients

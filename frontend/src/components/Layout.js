@@ -1,228 +1,176 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React from 'react';
+import { useHistory, useLocation } from 'react-router-dom';
 import {
-    AppBar,
-    Box,
-    CssBaseline,
-    Drawer,
-    IconButton,
-    List,
-    ListItem,
-    ListItemIcon,
-    ListItemText,
-    Toolbar,
-    Typography,
-    Divider,
-    Menu,
-    MenuItem
+  AppBar,
+  Box,
+  CssBaseline,
+  Drawer,
+  IconButton,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Toolbar,
+  Typography,
+  Divider
 } from '@mui/material';
 import {
-    Menu as MenuIcon,
-    Dashboard as DashboardIcon,
-    Assignment as ReportIcon,
-    Person as PersonIcon,
-    People as PeopleIcon,
-    Settings as SettingsIcon,
-    AccountCircle
+  Menu as MenuIcon,
+  Dashboard as DashboardIcon,
+  People as PeopleIcon,
+  Business as BusinessIcon,
+  Assignment as AssignmentIcon,
+  Settings as SettingsIcon,
+  ExitToApp as LogoutIcon
 } from '@mui/icons-material';
+import { useRole } from '../context/RoleContext';
 
 const drawerWidth = 240;
 
 const Layout = ({ children }) => {
-    const navigate = useNavigate();
-    const [mobileOpen, setMobileOpen] = useState(false);
-    const [anchorEl, setAnchorEl] = useState(null);
+  const [mobileOpen, setMobileOpen] = React.useState(false);
+  const { role, logout } = useRole();
+  const history = useHistory();
+  const location = useLocation();
 
-    // Mock user with super_admin role for development
-    const mockUser = {
-        name: 'Development User',
-        email: 'dev@example.com',
-        role: 'super_admin'
-    };
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
+  };
 
-    const handleDrawerToggle = () => {
-        setMobileOpen(!mobileOpen);
-    };
+  const handleNavigation = (path) => {
+    history.push(path);
+    setMobileOpen(false);
+  };
 
-    const handleMenu = (event) => {
-        setAnchorEl(event.currentTarget);
-    };
+  const handleLogout = () => {
+    logout();
+    history.push('/login');
+  };
 
-    const handleClose = () => {
-        setAnchorEl(null);
-    };
+  const getMenuItems = () => {
+    const menuItems = [];
 
-    const handleLogout = () => {
-        // Simply navigate to home since we're bypassing auth
-        navigate('/');
-    };
+    if (role === 'super_admin') {
+      menuItems.push(
+        { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
+        { text: 'Labs', icon: <BusinessIcon />, path: '/labs' },
+        { text: 'Users', icon: <PeopleIcon />, path: '/users' }
+      );
+    } else if (role === 'admin') {
+      menuItems.push(
+        { text: 'Dashboard', icon: <DashboardIcon />, path: '/admin' },
+        { text: 'Technicians', icon: <PeopleIcon />, path: '/technicians' },
+        { text: 'Patients', icon: <PeopleIcon />, path: '/patients' },
+        { text: 'Reports', icon: <AssignmentIcon />, path: '/reports' }
+      );
+    } else if (role === 'technician') {
+      menuItems.push(
+        { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
+        { text: 'Patients', icon: <PeopleIcon />, path: '/patients' },
+        { text: 'Reports', icon: <AssignmentIcon />, path: '/reports' }
+      );
+    }
 
-    const menuItems = [
-        {
-            text: 'Dashboard',
-            icon: <DashboardIcon />,
-            path: '/',
-            roles: ['super_admin', 'admin', 'technician']
-        },
-        {
-            text: 'Reports',
-            icon: <ReportIcon />,
-            path: '/reports',
-            roles: ['super_admin', 'admin', 'technician']
-        },
-        {
-            text: 'Patients',
-            icon: <PeopleIcon />,
-            path: '/patients',
-            roles: ['super_admin', 'admin', 'technician']
-        },
-        {
-            text: 'Users',
-            icon: <PersonIcon />,
-            path: '/users',
-            roles: ['super_admin']
-        },
-        {
-            text: 'Settings',
-            icon: <SettingsIcon />,
-            path: '/settings',
-            roles: ['super_admin', 'admin']
-        }
-    ];
-
-    const drawer = (
-        <div>
-            <Toolbar>
-                <Typography variant="h6" noWrap component="div">
-                    Lab Management
-                </Typography>
-            </Toolbar>
-            <Divider />
-            <List>
-                {menuItems
-                    .filter(item => item.roles.includes(mockUser.role))
-                    .map((item) => (
-                        <ListItem
-                            button
-                            key={item.text}
-                            onClick={() => navigate(item.path)}
-                        >
-                            <ListItemIcon>{item.icon}</ListItemIcon>
-                            <ListItemText primary={item.text} />
-                        </ListItem>
-                    ))}
-            </List>
-        </div>
+    // Common menu items
+    menuItems.push(
+      { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
+      { text: 'Logout', icon: <LogoutIcon />, onClick: handleLogout }
     );
 
-    return (
-        <Box sx={{ display: 'flex' }}>
-            <CssBaseline />
-            <AppBar
-                position="fixed"
-                sx={{
-                    width: { sm: `calc(100% - ${drawerWidth}px)` },
-                    ml: { sm: `${drawerWidth}px` }
-                }}
-            >
-                <Toolbar>
-                    <IconButton
-                        color="inherit"
-                        aria-label="open drawer"
-                        edge="start"
-                        onClick={handleDrawerToggle}
-                        sx={{ mr: 2, display: { sm: 'none' } }}
-                    >
-                        <MenuIcon />
-                    </IconButton>
-                    <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-                        Pathology Lab
-                    </Typography>
-                    <div>
-                        <IconButton
-                            size="large"
-                            aria-label="account of current user"
-                            aria-controls="menu-appbar"
-                            aria-haspopup="true"
-                            onClick={handleMenu}
-                            color="inherit"
-                        >
-                            <AccountCircle />
-                        </IconButton>
-                        <Menu
-                            id="menu-appbar"
-                            anchorEl={anchorEl}
-                            anchorOrigin={{
-                                vertical: 'top',
-                                horizontal: 'right'
-                            }}
-                            keepMounted
-                            transformOrigin={{
-                                vertical: 'top',
-                                horizontal: 'right'
-                            }}
-                            open={Boolean(anchorEl)}
-                            onClose={handleClose}
-                        >
-                            <MenuItem onClick={() => {
-                                handleClose();
-                                navigate('/profile');
-                            }}>
-                                Profile
-                            </MenuItem>
-                            <MenuItem onClick={handleLogout}>Logout</MenuItem>
-                        </Menu>
-                    </div>
-                </Toolbar>
-            </AppBar>
-            <Box
-                component="nav"
-                sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
-            >
-                <Drawer
-                    variant="temporary"
-                    open={mobileOpen}
-                    onClose={handleDrawerToggle}
-                    ModalProps={{
-                        keepMounted: true // Better open performance on mobile.
-                    }}
-                    sx={{
-                        display: { xs: 'block', sm: 'none' },
-                        '& .MuiDrawer-paper': {
-                            boxSizing: 'border-box',
-                            width: drawerWidth
-                        }
-                    }}
-                >
-                    {drawer}
-                </Drawer>
-                <Drawer
-                    variant="permanent"
-                    sx={{
-                        display: { xs: 'none', sm: 'block' },
-                        '& .MuiDrawer-paper': {
-                            boxSizing: 'border-box',
-                            width: drawerWidth
-                        }
-                    }}
-                    open
-                >
-                    {drawer}
-                </Drawer>
-            </Box>
-            <Box
-                component="main"
-                sx={{
-                    flexGrow: 1,
-                    p: 3,
-                    width: { sm: `calc(100% - ${drawerWidth}px)` },
-                    mt: 8
-                }}
-            >
-                {children}
-            </Box>
-        </Box>
-    );
+    return menuItems;
+  };
+
+  const drawer = (
+    <div>
+      <Toolbar />
+      <Divider />
+      <List>
+        {getMenuItems().map((item) => (
+          <ListItem
+            button
+            key={item.text}
+            onClick={item.onClick || (() => handleNavigation(item.path))}
+            selected={location.pathname === item.path}
+          >
+            <ListItemIcon>{item.icon}</ListItemIcon>
+            <ListItemText primary={item.text} />
+          </ListItem>
+        ))}
+      </List>
+    </div>
+  );
+
+  return (
+    <Box sx={{ display: 'flex' }}>
+      <CssBaseline />
+      <AppBar
+        position="fixed"
+        sx={{
+          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          ml: { sm: `${drawerWidth}px` },
+        }}
+      >
+        <Toolbar>
+          <IconButton
+            color="inherit"
+            aria-label="open drawer"
+            edge="start"
+            onClick={handleDrawerToggle}
+            sx={{ mr: 2, display: { sm: 'none' } }}
+          >
+            <MenuIcon />
+          </IconButton>
+          <Typography variant="h6" noWrap component="div">
+            Lab Management System
+          </Typography>
+          <Box sx={{ flexGrow: 1 }} />
+          <Typography variant="subtitle1" noWrap component="div">
+            {role ? `${role.charAt(0).toUpperCase() + role.slice(1)} (${role})` : ''}
+          </Typography>
+        </Toolbar>
+      </AppBar>
+      <Box
+        component="nav"
+        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
+      >
+        <Drawer
+          variant="temporary"
+          open={mobileOpen}
+          onClose={handleDrawerToggle}
+          ModalProps={{
+            keepMounted: true, // Better open performance on mobile.
+          }}
+          sx={{
+            display: { xs: 'block', sm: 'none' },
+            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+          }}
+        >
+          {drawer}
+        </Drawer>
+        <Drawer
+          variant="permanent"
+          sx={{
+            display: { xs: 'none', sm: 'block' },
+            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
+          }}
+          open
+        >
+          {drawer}
+        </Drawer>
+      </Box>
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          p: 3,
+          width: { sm: `calc(100% - ${drawerWidth}px)` },
+          mt: ['48px', '56px', '64px'],
+        }}
+      >
+        {children}
+      </Box>
+    </Box>
+  );
 };
 
 export default Layout;
